@@ -2,7 +2,6 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Broadcast Live - 141VYBZ</title>
 </head>
 <body>
@@ -12,28 +11,26 @@
 
   <script>
     let ws;
-    let processor, stream;
+    let processor;
+    let stream;
 
     document.getElementById('startBtn').onclick = async () => {
       ws = new WebSocket(location.origin.replace(/^http/, 'ws') + '/broadcast');
+      ws.binaryType = 'arraybuffer';
 
       stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
       const source = audioCtx.createMediaStreamSource(stream);
-      processor = audioCtx.createScriptProcessor(2048, 1, 1);
+      processor = audioCtx.createScriptProcessor(4096, 1, 1);
 
       processor.onaudioprocess = (e) => {
         const input = e.inputBuffer.getChannelData(0);
-        const buffer = new ArrayBuffer(input.length * 2);
-        const view = new DataView(buffer);
-
+        const int16Buffer = new Int16Array(input.length);
         for (let i = 0; i < input.length; i++) {
-          const sample = Math.max(-1, Math.min(1, input[i]));
-          view.setInt16(i * 2, sample * 0x7fff, true);
+          int16Buffer[i] = input[i] * 0x7FFF; // Convert float to 16-bit PCM
         }
-
         if (ws.readyState === WebSocket.OPEN) {
-          ws.send(buffer);
+          ws.send(int16Buffer.buffer);
         }
       };
 
@@ -45,10 +42,9 @@
     };
 
     document.getElementById('stopBtn').onclick = () => {
-      if (processor) processor.disconnect();
-      if (stream) stream.getTracks().forEach(t => t.stop());
-      if (ws) ws.close();
-
+      processor.disconnect();
+      stream.getTracks().forEach(track => track.stop());
+      ws.close();
       document.getElementById('startBtn').disabled = false;
       document.getElementById('stopBtn').disabled = true;
     };
