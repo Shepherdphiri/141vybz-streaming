@@ -1,68 +1,26 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-  <meta charset="UTF-8" />
-  <title>141VYBZ Live Radio</title>
+  <title>Live Stream</title>
 </head>
 <body>
-  <h1>🎧 Listen Live on 141VYBZ</h1>
-  <button id="startListeningBtn">Start Listening</button>
-  <button id="stopListeningBtn" disabled>Stop Listening</button>
-
+  <h2>Now Streaming...</h2>
+  <audio autoplay></audio>
   <script>
-    let ws, audioCtx, speaker;
-    let bufferQueue = [];
+    const audio = document.querySelector('audio');
+    const ctx = new AudioContext();
+    const queue = [];
 
-    const startBtn = document.getElementById('startListeningBtn');
-    const stopBtn = document.getElementById('stopListeningBtn');
+    const socket = new WebSocket(location.origin.replace('http', 'ws').replace('https', 'wss') + '/ws');
+    socket.binaryType = 'arraybuffer';
 
-    function playAudio() {
-      speaker = audioCtx.createScriptProcessor(4096, 1, 1);
-      speaker.onaudioprocess = (e) => {
-        const output = e.outputBuffer.getChannelData(0);
-        output.fill(0);
-        if (bufferQueue.length > 0) {
-          const pcm = bufferQueue.shift();
-          for (let i = 0; i < pcm.length && i < output.length; i++) {
-            output[i] = pcm[i] / 0x7FFF;
-          }
-        }
-      };
-      speaker.connect(audioCtx.destination);
-    }
-
-    startBtn.onclick = () => {
-      ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/stream');
-      ws.binaryType = 'arraybuffer';
-
-      ws.onopen = () => {
-        console.log('Connected to stream');
-        startBtn.disabled = true;
-        stopBtn.disabled = false;
-      };
-
-      ws.onmessage = (msg) => {
-        const data = new Int16Array(msg.data);
-        bufferQueue.push(data);
-      };
-
-      ws.onclose = () => {
-        console.log('Stream closed');
-        startBtn.disabled = false;
-        stopBtn.disabled = true;
-      };
-
-      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-      playAudio();
-    };
-
-    stopBtn.onclick = () => {
-      if (speaker) speaker.disconnect();
-      if (audioCtx) audioCtx.close();
-      if (ws) ws.close();
-
-      startBtn.disabled = false;
-      stopBtn.disabled = true;
+    socket.onopen = () => socket.send('ROLE:listener');
+    socket.onmessage = async (event) => {
+      const buffer = await ctx.decodeAudioData(event.data.slice(0));
+      const src = ctx.createBufferSource();
+      src.buffer = buffer;
+      src.connect(ctx.destination);
+      src.start();
     };
   </script>
 </body>
