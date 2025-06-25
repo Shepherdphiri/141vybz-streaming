@@ -1,13 +1,11 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>141VYBZ Radio</title>
+  <meta charset="UTF-8">
+  <title>141VYBZ Listener</title>
 </head>
 <body>
-  <h1>🎧 Welcome to 141VYBZ Live Radio</h1>
-  <p>Streaming the hottest vibes live, right now.</p>
+  <h1>🎧 Listening to 141VYBZ Live</h1>
   <button id="startBtn">Start Listening</button>
 
   <script>
@@ -16,24 +14,25 @@
       ws.binaryType = 'arraybuffer';
 
       const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-      const scriptNode = audioCtx.createScriptProcessor(4096, 1, 1);
-      const audioQueue = [];
+      const processor = audioCtx.createScriptProcessor(4096, 1, 1);
+      const bufferQueue = [];
 
-      scriptNode.onaudioprocess = (event) => {
-        const output = event.outputBuffer.getChannelData(0);
-        if (audioQueue.length > 0) {
-          output.set(audioQueue.shift());
+      ws.onmessage = (event) => {
+        const floatArray = new Float32Array(event.data);
+        bufferQueue.push(floatArray);
+      };
+
+      processor.onaudioprocess = (e) => {
+        const output = e.outputBuffer.getChannelData(0);
+        if (bufferQueue.length) {
+          const chunk = bufferQueue.shift();
+          output.set(chunk.subarray(0, output.length));
         } else {
           output.fill(0); // silence if no data
         }
       };
 
-      ws.onmessage = (event) => {
-        const floatBuffer = new Float32Array(event.data);
-        audioQueue.push(floatBuffer);
-      };
-
-      scriptNode.connect(audioCtx.destination);
+      processor.connect(audioCtx.destination);
     });
   </script>
 </body>
