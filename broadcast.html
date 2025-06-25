@@ -9,25 +9,47 @@
   <h1>🎙️ Go Live on 141VYBZ</h1>
   <button id="startBtn">Start Broadcast</button>
   <button id="stopBtn" disabled>Stop Broadcast</button>
+
   <script>
-  const ws = new WebSocket(location.origin.replace(/^http/, 'ws') + '/broadcast');
-  const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    let ws;
+    let processor;
+    let source;
+    let audioCtx;
 
-  navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
-    const source = audioCtx.createMediaStreamSource(stream);
-    const processor = audioCtx.createScriptProcessor(4096, 1, 1);
+    document.getElementById('startBtn').onclick = async () => {
+      ws = new WebSocket(location.origin.replace(/^http/, 'ws') + '/broadcast-ws');
 
-    processor.onaudioprocess = (e) => {
-      const input = e.inputBuffer.getChannelData(0);
-      if (ws.readyState === WebSocket.OPEN) {
-        ws.send(input.buffer); // sending raw Float32Array buffer
-      }
+      ws.onopen = async () => {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+        source = audioCtx.createMediaStreamSource(stream);
+        processor = audioCtx.createScriptProcessor(4096, 1, 1);
+
+        processor.onaudioprocess = (e) => {
+          const input = e.inputBuffer.getChannelData(0);
+          if (ws.readyState === WebSocket.OPEN) {
+            ws.send(new Float32Array(input).buffer); // Send audio buffer
+          }
+        };
+
+        source.connect(processor);
+        processor.connect(audioCtx.destination);
+
+        document.getElementById('startBtn').disabled = true;
+        document.getElementById('stopBtn').disabled = false;
+      };
     };
 
-    source.connect(processor);
-    processor.connect(audioCtx.destination);
-  });
-</script>
+    document.getElementById('stopBtn').onclick = () => {
+      if (ws) ws.close();
+      if (processor) processor.disconnect();
+      if (source) source.disconnect();
+      if (audioCtx) audioCtx.close();
 
+      document.getElementById('startBtn').disabled = false;
+      document.getElementById('stopBtn').disabled = true;
+    };
+  </script>
 </body>
 </html>
