@@ -8,9 +8,33 @@
 <body>
   <h1>🎧 Welcome to 141VYBZ Live Radio</h1>
   <p>Streaming the hottest vibes live, right now.</p>
-  <audio id="livePlayer" controls autoplay>
-    <source src="/stream" type="audio/webm" />
-    Your browser does not support the audio element.
-  </audio>
+  <button id="startBtn">Start Listening</button>
+
+  <script>
+    document.getElementById('startBtn').addEventListener('click', () => {
+      const ws = new WebSocket(location.origin.replace(/^http/, 'ws') + '/stream');
+      ws.binaryType = 'arraybuffer';
+
+      const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const scriptNode = audioCtx.createScriptProcessor(4096, 1, 1);
+      const audioQueue = [];
+
+      scriptNode.onaudioprocess = (event) => {
+        const output = event.outputBuffer.getChannelData(0);
+        if (audioQueue.length > 0) {
+          output.set(audioQueue.shift());
+        } else {
+          output.fill(0); // silence if no data
+        }
+      };
+
+      ws.onmessage = (event) => {
+        const floatBuffer = new Float32Array(event.data);
+        audioQueue.push(floatBuffer);
+      };
+
+      scriptNode.connect(audioCtx.destination);
+    });
+  </script>
 </body>
 </html>
