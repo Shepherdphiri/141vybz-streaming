@@ -12,40 +12,42 @@
 
   <script>
     let ws;
-    let processor;
-    let source;
-    let audioCtx;
+    let processor, stream;
 
     document.getElementById('startBtn').onclick = async () => {
-      ws = new WebSocket(location.origin.replace(/^http/, 'ws') + '/broadcast-ws');
+      ws = new WebSocket(location.origin.replace(/^http/, 'ws') + '/broadcast');
 
-      ws.onopen = async () => {
-        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const source = audioCtx.createMediaStreamSource(stream);
+      processor = audioCtx.createScriptProcessor(2048, 1, 1);
 
-        source = audioCtx.createMediaStreamSource(stream);
-        processor = audioCtx.createScriptProcessor(4096, 1, 1);
+      processor.onaudioprocess = (e) => {
+        const input = e.inputBuffer.getChannelData(0);
+        const buffer = new ArrayBuffer(input.length * 2);
+        const view = new DataView(buffer);
 
-        processor.onaudioprocess = (e) => {
-          const input = e.inputBuffer.getChannelData(0);
-          if (ws.readyState === WebSocket.OPEN) {
-            ws.send(new Float32Array(input).buffer); // Send audio buffer
-          }
-        };
+        for (let i = 0; i < input.length; i++) {
+          const sample = Math.max(-1, Math.min(1, input[i]));
+          view.setInt16(i * 2, sample * 0x7fff, true);
+        }
 
-        source.connect(processor);
-        processor.connect(audioCtx.destination);
-
-        document.getElementById('startBtn').disabled = true;
-        document.getElementById('stopBtn').disabled = false;
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(buffer);
+        }
       };
+
+      source.connect(processor);
+      processor.connect(audioCtx.destination);
+
+      document.getElementById('startBtn').disabled = true;
+      document.getElementById('stopBtn').disabled = false;
     };
 
     document.getElementById('stopBtn').onclick = () => {
-      if (ws) ws.close();
       if (processor) processor.disconnect();
-      if (source) source.disconnect();
-      if (audioCtx) audioCtx.close();
+      if (stream) stream.getTracks().forEach(t => t.stop());
+      if (ws) ws.close();
 
       document.getElementById('startBtn').disabled = false;
       document.getElementById('stopBtn').disabled = true;
