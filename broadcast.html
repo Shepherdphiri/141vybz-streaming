@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Broadcast Live - 141VYBZ</title>
+</head>
+<body>
+  <h1>🎙️ Go Live on 141VYBZ</h1>
+  <button id="startBtn">Start Broadcast</button>
+  <button id="stopBtn" disabled>Stop Broadcast</button>
+  <script>
+    let mediaRecorder;
+    let ws;
+
+    document.getElementById('startBtn').onclick = async () => {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      ws = new WebSocket('wss://' + window.location.host + '/broadcast');
+      mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+      mediaRecorder.ondataavailable = e => {
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(e.data);
+        }
+      };
+      mediaRecorder.start(100);
+      document.getElementById('startBtn').disabled = true;
+      document.getElementById('stopBtn').disabled = false;
+    };
+
+    document.getElementById('stopBtn').onclick = () => {
+      mediaRecorder.stop();
+      ws.close();
+      document.getElementById('startBtn').disabled = false;
+      document.getElementById('stopBtn').disabled = true;
+    };
+  </script>
+</body>
+</html>
