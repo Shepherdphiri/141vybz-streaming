@@ -10,29 +10,24 @@
   <button id="startBtn">Start Broadcast</button>
   <button id="stopBtn" disabled>Stop Broadcast</button>
   <script>
-    let mediaRecorder;
-    let ws;
+  const ws = new WebSocket(location.origin.replace(/^http/, 'ws') + '/broadcast');
+  const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
-    document.getElementById('startBtn').onclick = async () => {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      ws = new WebSocket('wss://' + window.location.host + '/broadcast');
-      mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
-      mediaRecorder.ondataavailable = e => {
-        if (ws.readyState === WebSocket.OPEN) {
-          ws.send(e.data);
-        }
-      };
-      mediaRecorder.start(100);
-      document.getElementById('startBtn').disabled = true;
-      document.getElementById('stopBtn').disabled = false;
+  navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
+    const source = audioCtx.createMediaStreamSource(stream);
+    const processor = audioCtx.createScriptProcessor(4096, 1, 1);
+
+    processor.onaudioprocess = (e) => {
+      const input = e.inputBuffer.getChannelData(0);
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send(input.buffer); // sending raw Float32Array buffer
+      }
     };
 
-    document.getElementById('stopBtn').onclick = () => {
-      mediaRecorder.stop();
-      ws.close();
-      document.getElementById('startBtn').disabled = false;
-      document.getElementById('stopBtn').disabled = true;
-    };
-  </script>
+    source.connect(processor);
+    processor.connect(audioCtx.destination);
+  });
+</script>
+
 </body>
 </html>
