@@ -9,14 +9,19 @@
   <script>
     const audio = document.querySelector('audio');
     const ctx = new AudioContext();
-    const queue = [];
-
-    const socket = new WebSocket(location.origin.replace('http', 'ws').replace('https', 'wss') + '/ws');
+    await ctx.resume(); // Optional but ensures playback starts
+    const socket = new WebSocket(location.origin.replace(/^http/, 'ws') + '/ws');
     socket.binaryType = 'arraybuffer';
 
     socket.onopen = () => socket.send('ROLE:listener');
-    socket.onmessage = async (event) => {
-      const buffer = await ctx.decodeAudioData(event.data.slice(0));
+    socket.onmessage = e => {
+      const int16 = new Int16Array(e.data);
+      const float32 = new Float32Array(int16.length);
+      for (let i = 0; i < int16.length; i++) {
+        float32[i] = int16[i] / 32767;
+      }
+      const buffer = ctx.createBuffer(1, float32.length, ctx.sampleRate);
+      buffer.copyToChannel(float32, 0);
       const src = ctx.createBufferSource();
       src.buffer = buffer;
       src.connect(ctx.destination);
