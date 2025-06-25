@@ -6,30 +6,25 @@
 <body>
   <h2>Now Streaming...</h2>
   <button onclick="start()">Listen</button>
-  <audio autoplay></audio>
+  <audio autoplay controls></audio>
   <script>
-    async function start() {
-      const ctx = new AudioContext();
-      await ctx.resume();
+    function start() {
+      const mediaSource = new MediaSource();
+      const audio = document.querySelector('audio');
+      audio.src = URL.createObjectURL(mediaSource);
 
-      const socket = new WebSocket(location.origin.replace(/^http/, 'ws') + '/ws');
-      socket.binaryType = 'arraybuffer';
-      socket.onopen = () => socket.send('ROLE:listener');
+      mediaSource.addEventListener('sourceopen', () => {
+        const sourceBuffer = mediaSource.addSourceBuffer('audio/webm; codecs=opus');
+        const socket = new WebSocket(location.origin.replace(/^http/, 'ws') + '/ws');
+        socket.binaryType = 'arraybuffer';
 
-      socket.onmessage = (e) => {
-        const int16 = new Int16Array(e.data);
-        const float32 = new Float32Array(int16.length);
-        for (let i = 0; i < int16.length; i++) {
-          float32[i] = int16[i] / 32767;
-        }
+        socket.onopen = () => socket.send('ROLE:listener');
 
-        const buffer = ctx.createBuffer(1, float32.length, ctx.sampleRate);
-        buffer.copyToChannel(float32, 0);
-        const src = ctx.createBufferSource();
-        src.buffer = buffer;
-        src.connect(ctx.destination);
-        src.start();
-      };
+        socket.onmessage = (e) => {
+          if (sourceBuffer.updating || mediaSource.readyState !== 'open') return;
+          sourceBuffer.appendBuffer(new Uint8Array(e.data));
+        };
+      });
     }
   </script>
 </body>
