@@ -9,25 +9,19 @@
   <script>
     async function start() {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const ctx = new AudioContext();
-      await ctx.resume();
-      const src = ctx.createMediaStreamSource(stream);
-      const processor = ctx.createScriptProcessor(4096, 1, 1);
+      const recorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
 
       const socket = new WebSocket(location.origin.replace(/^http/, 'ws') + '/ws');
       socket.binaryType = 'arraybuffer';
-      socket.onopen = () => socket.send('ROLE:broadcaster');
 
-      src.connect(processor);
-      processor.connect(ctx.destination);
-      processor.onaudioprocess = e => {
-        const input = e.inputBuffer.getChannelData(0);
-        const int16 = new Int16Array(input.length);
-        for (let i = 0; i < input.length; i++) {
-          int16[i] = input[i] * 32767;
-        }
+      socket.onopen = () => {
+        socket.send('ROLE:broadcaster');
+        recorder.start(250); // Send chunks every 250ms
+      };
+
+      recorder.ondataavailable = (e) => {
         if (socket.readyState === WebSocket.OPEN) {
-          socket.send(int16.buffer);
+          socket.send(e.data);
         }
       };
     }
