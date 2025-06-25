@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>141VYBZ Live Radio</title>
+</head>
+<body>
+  <h1>🎧 Listen Live on 141VYBZ</h1>
+  <button id="startListeningBtn">Start Listening</button>
+  <button id="stopListeningBtn" disabled>Stop Listening</button>
+
+  <script>
+    let ws, audioCtx, speaker;
+    let bufferQueue = [];
+
+    const startBtn = document.getElementById('startListeningBtn');
+    const stopBtn = document.getElementById('stopListeningBtn');
+
+    function playAudio() {
+      speaker = audioCtx.createScriptProcessor(4096, 1, 1);
+      speaker.onaudioprocess = (e) => {
+        const output = e.outputBuffer.getChannelData(0);
+        output.fill(0);
+        if (bufferQueue.length > 0) {
+          const pcm = bufferQueue.shift();
+          for (let i = 0; i < pcm.length && i < output.length; i++) {
+            output[i] = pcm[i] / 0x7FFF;
+          }
+        }
+      };
+      speaker.connect(audioCtx.destination);
+    }
+
+    startBtn.onclick = () => {
+      ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/stream');
+      ws.binaryType = 'arraybuffer';
+
+      ws.onopen = () => {
+        console.log('Connected to stream');
+        startBtn.disabled = true;
+        stopBtn.disabled = false;
+      };
+
+      ws.onmessage = (msg) => {
+        const data = new Int16Array(msg.data);
+        bufferQueue.push(data);
+      };
+
+      ws.onclose = () => {
+        console.log('Stream closed');
+        startBtn.disabled = false;
+        stopBtn.disabled = true;
+      };
+
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      playAudio();
+    };
+
+    stopBtn.onclick = () => {
+      if (speaker) speaker.disconnect();
+      if (audioCtx) audioCtx.close();
+      if (ws) ws.close();
+
+      startBtn.disabled = false;
+      stopBtn.disabled = true;
+    };
+  </script>
+</body>
+</html>
