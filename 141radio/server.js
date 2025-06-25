@@ -14,8 +14,8 @@ wss.on('connection', ws => {
 
   ws.on('message', msg => {
     if (typeof msg === 'string' && msg.startsWith('ROLE:')) {
-      if (msg === 'ROLE:listener') listeners.add(ws);
-      else isBroadcaster = true;
+      isBroadcaster = msg === 'ROLE:broadcaster';
+      if (!isBroadcaster) listeners.add(ws);
       return;
     }
 
@@ -34,4 +34,8 @@ wss.on('connection', ws => {
 });
 
 app.use(express.static(path.join(__dirname, 'public')));
-server.listen(process.env.PORT || 3000, () => console.log('Server running'));
+
+const port = process.env.PORT || 3000;
+server.listen(port, () => {
+  console.log(`Server running on port ${port}`);
+});
