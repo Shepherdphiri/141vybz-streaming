@@ -6,44 +6,61 @@
 </head>
 <body>
   <h1>🔊 Listening to 141VYBZ</h1>
-  <p>Status: <span id="status">Connecting...</span></p>
+  <button id="startAudio">Start Audio</button>
+  <p>Status: <span id="status">Disconnected</span></p>
 
   <script>
     const status = document.getElementById('status');
-    const ws = new WebSocket(location.origin.replace(/^http/, 'ws') + '/stream');
-    ws.binaryType = 'arraybuffer';
-
-    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    const sampleRate = 44100;
-
-    const speaker = audioCtx.createScriptProcessor(4096, 1, 1);
-    speaker.connect(audioCtx.destination);
-
+    const startBtn = document.getElementById('startAudio');
+    let audioCtx;
+    let speaker;
+    let ws;
     let bufferQueue = [];
 
-    speaker.onaudioprocess = (e) => {
-      const output = e.outputBuffer.getChannelData(0);
-      output.fill(0);
+    startBtn.onclick = () => {
+      // Create AudioContext on user gesture
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
-      if (bufferQueue.length) {
-        const pcm = bufferQueue.shift();
-        for (let i = 0; i < pcm.length && i < output.length; i++) {
-          output[i] = pcm[i] / 0x7FFF;
+      speaker = audioCtx.createScriptProcessor(4096, 1, 1);
+      speaker.connect(audioCtx.destination);
+
+      speaker.onaudioprocess = (e) => {
+        const output = e.outputBuffer.getChannelData(0);
+        output.fill(0);
+        if (bufferQueue.length) {
+          const pcm = bufferQueue.shift();
+          for (let i = 0; i < pcm.length && i < output.length; i++) {
+            output[i] = pcm[i] / 0x7FFF;
+          }
         }
+      };
+
+      ws = new WebSocket(location.origin.replace(/^http/, 'ws') + '/stream');
+      ws.binaryType = 'arraybuffer';
+
+      ws.onopen = () => {
+        status.textContent = "Connected - Listening...";
+        console.log('WebSocket connected');
+      };
+
+      ws.onmessage = (msg) => {
+        const data = new Int16Array(msg.data);
+        bufferQueue.push(data);
+      };
+
+      ws.onclose = () => {
+        status.textContent = "Disconnected";
+        console.log('WebSocket disconnected');
+      };
+
+      // Resume AudioContext if suspended
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume().then(() => {
+          console.log('AudioContext resumed');
+        });
       }
-    };
 
-    ws.onmessage = (msg) => {
-      const data = new Int16Array(msg.data);
-      bufferQueue.push(data);
-    };
-
-    ws.onopen = () => {
-      status.textContent = "Connected - Listening...";
-    };
-
-    ws.onclose = () => {
-      status.textContent = "Disconnected";
+      startBtn.disabled = true;
     };
   </script>
 </body>
