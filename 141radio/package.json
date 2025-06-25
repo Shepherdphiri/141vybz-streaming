@@ -1,5 +1,5 @@
 {
-  "name": "live-audio-stream",
+  "name": "streamcast-webm",
   "version": "1.0.0",
   "scripts": {
     "start": "node server.js"
