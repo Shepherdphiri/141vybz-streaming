@@ -10,7 +10,7 @@
     async function start() {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const ctx = new AudioContext();
-      await ctx.resume(); // Required for some browsers
+      await ctx.resume();
       const src = ctx.createMediaStreamSource(stream);
       const processor = ctx.createScriptProcessor(4096, 1, 1);
 
