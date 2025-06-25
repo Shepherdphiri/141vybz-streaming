@@ -1,16 +1,12 @@
 {
-  "name": "141vybz-broadcast",
+  "name": "browser-audio-stream",
   "version": "1.0.0",
-  "description": "Live audio broadcast and stream system for 141VYBZ",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
   },
-  "engines": {
-    "node": ">=14.0.0"
-  },
   "dependencies": {
     "express": "^4.18.2",
-    "ws": "^8.15.1"
+    "ws": "^8.13.0"
   }
 }
