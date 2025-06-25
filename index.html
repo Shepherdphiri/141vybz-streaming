@@ -8,27 +8,29 @@
 <body>
   <h1>🎧 Welcome to 141VYBZ Live Radio</h1>
   <p>Streaming the hottest vibes live, right now.</p>
-  <audio id="livePlayer" controls autoplay></audio>
 
   <script>
     const ws = new WebSocket(location.origin.replace(/^http/, 'ws') + '/stream');
     const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    const audioQueue = [];
-    let playing = false;
-
-    const speaker = audioCtx.createScriptProcessor(4096, 1, 1);
-    speaker.onaudioprocess = (e) => {
-      if (audioQueue.length > 0) {
-        const buffer = audioQueue.shift();
-        e.outputBuffer.getChannelData(0).set(buffer);
-      }
-    };
-    speaker.connect(audioCtx.destination);
 
     ws.binaryType = 'arraybuffer';
+
     ws.onmessage = (msg) => {
-      const floatBuffer = new Float32Array(msg.data);
-      audioQueue.push(floatBuffer);
+      const buffer = msg.data;
+      const int16 = new Int16Array(buffer);
+      const float32 = new Float32Array(int16.length);
+
+      for (let i = 0; i < int16.length; i++) {
+        float32[i] = int16[i] / 0x7fff;
+      }
+
+      const audioBuffer = audioCtx.createBuffer(1, float32.length, audioCtx.sampleRate);
+      audioBuffer.copyToChannel(float32, 0);
+
+      const source = audioCtx.createBufferSource();
+      source.buffer = audioBuffer;
+      source.connect(audioCtx.destination);
+      source.start();
     };
   </script>
 </body>
