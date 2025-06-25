@@ -13,14 +13,16 @@
     let ws;
     let processor;
     let stream;
+    let audioCtx;
+    let source;
 
     document.getElementById('startBtn').onclick = async () => {
       ws = new WebSocket(location.origin.replace(/^http/, 'ws') + '/broadcast');
       ws.binaryType = 'arraybuffer';
 
       stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-      const source = audioCtx.createMediaStreamSource(stream);
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      source = audioCtx.createMediaStreamSource(stream);
       processor = audioCtx.createScriptProcessor(4096, 1, 1);
 
       processor.onaudioprocess = (e) => {
@@ -43,6 +45,7 @@
 
     document.getElementById('stopBtn').onclick = () => {
       processor.disconnect();
+      source.disconnect();
       stream.getTracks().forEach(track => track.stop());
       ws.close();
       document.getElementById('startBtn').disabled = false;
