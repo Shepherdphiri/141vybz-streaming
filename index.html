@@ -2,35 +2,48 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>141VYBZ Radio</title>
+  <title>141VYBZ Live</title>
 </head>
 <body>
-  <h1>🎧 Welcome to 141VYBZ Live Radio</h1>
-  <p>Streaming the hottest vibes live, right now.</p>
+  <h1>🔊 Listening to 141VYBZ</h1>
+  <p>Status: <span id="status">Connecting...</span></p>
 
   <script>
+    const status = document.getElementById('status');
     const ws = new WebSocket(location.origin.replace(/^http/, 'ws') + '/stream');
-    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-
     ws.binaryType = 'arraybuffer';
 
-    ws.onmessage = (msg) => {
-      const buffer = msg.data;
-      const int16 = new Int16Array(buffer);
-      const float32 = new Float32Array(int16.length);
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const sampleRate = 44100;
 
-      for (let i = 0; i < int16.length; i++) {
-        float32[i] = int16[i] / 0x7fff;
+    const speaker = audioCtx.createScriptProcessor(4096, 1, 1);
+    speaker.connect(audioCtx.destination);
+
+    let bufferQueue = [];
+
+    speaker.onaudioprocess = (e) => {
+      const output = e.outputBuffer.getChannelData(0);
+      output.fill(0);
+
+      if (bufferQueue.length) {
+        const pcm = bufferQueue.shift();
+        for (let i = 0; i < pcm.length && i < output.length; i++) {
+          output[i] = pcm[i] / 0x7FFF;
+        }
       }
+    };
 
-      const audioBuffer = audioCtx.createBuffer(1, float32.length, audioCtx.sampleRate);
-      audioBuffer.copyToChannel(float32, 0);
+    ws.onmessage = (msg) => {
+      const data = new Int16Array(msg.data);
+      bufferQueue.push(data);
+    };
 
-      const source = audioCtx.createBufferSource();
-      source.buffer = audioBuffer;
-      source.connect(audioCtx.destination);
-      source.start();
+    ws.onopen = () => {
+      status.textContent = "Connected - Listening...";
+    };
+
+    ws.onclose = () => {
+      status.textContent = "Disconnected";
     };
   </script>
 </body>
