@@ -1,61 +1,31 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-  <meta charset="UTF-8" />
-  <title>Broadcast Live - 141VYBZ</title>
+  <title>Broadcast Audio</title>
 </head>
 <body>
-  <h1>🎙️ Broadcast Live on 141VYBZ</h1>
-  <button id="startBtn">Start Broadcast</button>
-  <button id="stopBtn" disabled>Stop Broadcast</button>
-
+  <h2>Broadcast Live</h2>
+  <button onclick="start()">Start Broadcasting</button>
   <script>
-    let ws, audioCtx, source, processor;
-
-    const startBtn = document.getElementById('startBtn');
-    const stopBtn = document.getElementById('stopBtn');
-
-    startBtn.onclick = async () => {
-      ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/broadcast');
-      ws.binaryType = 'arraybuffer';
-
-      ws.onopen = () => console.log('WebSocket connected for broadcast');
-      ws.onclose = () => console.log('WebSocket closed');
-
-      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    async function start() {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const ctx = new AudioContext();
+      const src = ctx.createMediaStreamSource(stream);
+      const processor = ctx.createScriptProcessor(4096, 1, 1);
 
-      source = audioCtx.createMediaStreamSource(stream);
-      processor = audioCtx.createScriptProcessor(4096, 1, 1);
+      const socket = new WebSocket(location.origin.replace('http', 'ws').replace('https', 'wss') + '/ws');
+      socket.binaryType = 'arraybuffer';
+      socket.onopen = () => socket.send('ROLE:broadcaster');
 
-      processor.onaudioprocess = (e) => {
-        const input = e.inputBuffer.getChannelData(0);
-        const buffer = new Int16Array(input.length);
-        for (let i = 0; i < input.length; i++) {
-          let s = Math.max(-1, Math.min(1, input[i]));
-          buffer[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
-        }
-        if (ws.readyState === WebSocket.OPEN) {
-          ws.send(buffer.buffer);
+      src.connect(processor);
+      processor.connect(ctx.destination);
+      processor.onaudioprocess = e => {
+        if (socket.readyState === WebSocket.OPEN) {
+          const input = e.inputBuffer.getChannelData(0);
+          socket.send(input.buffer);
         }
       };
-
-      source.connect(processor);
-      processor.connect(audioCtx.destination);
-
-      startBtn.disabled = true;
-      stopBtn.disabled = false;
-    };
-
-    stopBtn.onclick = () => {
-      if (processor) processor.disconnect();
-      if (source) source.disconnect();
-      if (audioCtx) audioCtx.close();
-      if (ws) ws.close();
-
-      startBtn.disabled = false;
-      stopBtn.disabled = true;
-    };
+    }
   </script>
 </body>
 </html>
